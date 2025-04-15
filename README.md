@@ -20,12 +20,15 @@ A TikTok-style interface for browsing NASA's Astronomy Picture of the Day (APOD)
 
 ```
 APODTok/
-├── index.html          # Main application entry point
-├── app.js             # Core application logic
-├── styles.css         # Custom styles
+├── index.html        # Main application entry point
+├── app.js            # Core application logic
+├── styles.css        # Custom styles
 ├── sw.js             # Service worker for offline support
 ├── favicon.svg       # Application icon
 ├── netlify.toml      # Netlify deployment configuration
+├── netlify/          # Netlify-specific configuration and functions
+├── PRD.txt           # Product Requirements Document
+├── LICENSE           # MIT License file
 └── README.md         # Project documentation
 ```
 
