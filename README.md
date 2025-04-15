@@ -15,6 +15,7 @@ A TikTok-style interface for browsing NASA's Astronomy Picture of the Day (APOD)
 - Error handling with retry mechanism
 - Modern UI with Tailwind CSS
 - Netlify deployment ready
+- CORS handling for secure API requests
 
 ## Project Structure
 
@@ -65,6 +66,7 @@ The project uses:
 - Service Worker for offline support
 - NASA APOD API for content
 - Netlify for deployment and environment variable management
+- CORS proxy for secure API requests
 
 ### Key Implementation Details
 - Uses the NASA APOD API's random image endpoint
@@ -73,6 +75,7 @@ The project uses:
 - Mobile-first responsive design
 - No backend required - pure frontend implementation
 - Environment variables managed through Netlify
+- Secure CORS handling through Netlify Functions
 
 ## Deployment
 
