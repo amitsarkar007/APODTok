@@ -53,7 +53,6 @@ let apodCache = [];
 let isFetching = false;
 let touchStartY = 0;
 let pullToRefreshActive = false;
-let lastScrollTop = 0;
 let isScrolling = false;
 let scrollTimeout;
 
@@ -178,7 +177,7 @@ function createAPODCard(apod) {
         // Handle image load error with retry logic
         image.onerror = () => {
             retryCount++;
-            if (retryCount === 1 && apod.hdurl) {
+            if (retryCount < maxRetries && apod.hdurl) {
                 // Try loading HD version if available
                 console.log(`Retrying with HD URL for ${apod.title}`);
                 tryLoadImage(apod.hdurl);
