@@ -48,6 +48,19 @@ This application will utilize NASA's APOD API to present astronomy images in a d
   - Mobile-first responsive design
   - Infinite scrolling mechanism implementation
 
+- **CORS Handling:**
+  - Implement CORS proxy solution to handle cross-origin requests
+  - Use a lightweight CORS proxy service or implement a simple proxy server
+  - Ensure secure handling of API requests through the proxy
+  - Cache CORS responses to minimize proxy usage
+
+- **API Key Management:**
+  - Store API key securely using environment variables
+  - Implement rate limiting to stay within API usage limits
+  - Use API key rotation strategy for production deployment
+  - Never expose API key in client-side code or network requests
+  - Consider implementing a key management service for production
+
 - **Error Handling:**
   - Graceful fallback in case the API is unreachable or returns an error.
   - Clear messaging or retry mechanism.
