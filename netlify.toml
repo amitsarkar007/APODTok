@@ -10,4 +10,4 @@
   [plugins.inputs]
     files = ["app.js"]
     from = "NASA_API_KEY_PLACEHOLDER"
-    to = "process.env.NASA_API_KEY" 
+    to = "window.NASA_API_KEY" 

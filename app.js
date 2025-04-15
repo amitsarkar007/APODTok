@@ -1,5 +1,5 @@
 // NASA API configuration
-const API_KEY = 'NASA_API_KEY_PLACEHOLDER';
+const API_KEY = window.NASA_API_KEY || 'NASA_API_KEY_PLACEHOLDER';
 const API_URL = 'https://api.nasa.gov/planetary/apod';
 const CACHE_SIZE = 5; // Number of images to cache in advance
 
