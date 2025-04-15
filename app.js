@@ -14,19 +14,58 @@ async function initializeAPIKey() {
         
         // Fallback to Netlify function
         const response = await fetch('/.netlify/functions/get-api-key');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch API key: ${response.status} ${response.statusText}`);
+        }
         const data = await response.json();
+        if (!data.apiKey) {
+            throw new Error('API key not found in response');
+        }
         API_KEY = data.apiKey;
     } catch (error) {
         console.error('Failed to fetch API key:', error);
+        showError();
+        throw error;
     }
 }
 
 // Proxy helper function
 async function fetchWithProxy(url) {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    return JSON.parse(data.contents);
+    try {
+        // First try direct fetch
+        try {
+            const directResponse = await fetch(url);
+            if (directResponse.ok) {
+                return await directResponse.json();
+            }
+        } catch (directError) {
+            console.log('Direct fetch failed, falling back to proxy:', directError);
+        }
+
+        // Fallback to proxy
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            throw new Error(`Proxy request failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.contents) {
+            throw new Error('Invalid proxy response format');
+        }
+        
+        try {
+            return JSON.parse(data.contents);
+        } catch (parseError) {
+            console.error('Failed to parse proxy response:', data.contents);
+            throw new Error('Invalid JSON in proxy response');
+        }
+    } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+    }
 }
 
 // Register Service Worker
