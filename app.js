@@ -1,10 +1,18 @@
 // NASA API configuration
-const API_KEY = process.env.NASA_API_KEY || 'DEMO_KEY'; // Use environment variable with fallback to demo key
+const API_KEY = 'NASA_API_KEY_PLACEHOLDER';
 const API_URL = 'https://api.nasa.gov/planetary/apod';
 const CACHE_SIZE = 5; // Number of images to cache in advance
 
+// Proxy helper function
+async function fetchWithProxy(url) {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    return JSON.parse(data.contents);
+}
+
 // Register Service Worker
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
             .then(registration => {
@@ -46,10 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initializeCache() {
     showLoading();
     try {
-        const response = await fetch(`${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`);
-        if (!response.ok) throw new Error('Failed to fetch APODs');
-        
-        apodCache = await response.json();
+        const url = `${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`;
+        const data = await fetchWithProxy(url);
+        apodCache = data;
         displayAllAPODs();
         preloadNextImages();
     } catch (error) {
@@ -66,10 +73,8 @@ async function preloadNextImages() {
     
     isFetching = true;
     try {
-        const response = await fetch(`${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`);
-        if (!response.ok) throw new Error('Failed to fetch APODs');
-        
-        const newImages = await response.json();
+        const url = `${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`;
+        const newImages = await fetchWithProxy(url);
         
         // Start preloading images before adding them to the DOM
         const preloadPromises = newImages
@@ -209,10 +214,10 @@ function setupEventListeners() {
     // Scroll event for infinite scroll
     apodContainer.addEventListener('scroll', handleScroll);
 
-    // Touch events for pull-to-refresh
-    apodContainer.addEventListener('touchstart', handleTouchStart);
-    apodContainer.addEventListener('touchmove', handleTouchMove);
-    apodContainer.addEventListener('touchend', handleTouchEnd);
+    // Touch events for pull-to-refresh with passive option
+    apodContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+    apodContainer.addEventListener('touchmove', handleTouchMove, { passive: true });
+    apodContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     // Mouse events for pull-to-refresh
     apodContainer.addEventListener('mousedown', handleMouseDown);

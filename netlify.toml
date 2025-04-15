@@ -1,0 +1,13 @@
+[build]
+  command = "echo 'Building site...'"
+  publish = "."
+
+[build.environment]
+  NASA_API_KEY = "NASA_API_KEY_PLACEHOLDER"
+
+[[plugins]]
+  package = "netlify-plugin-replace"
+  [plugins.inputs]
+    files = ["app.js"]
+    from = "NASA_API_KEY_PLACEHOLDER"
+    to = "process.env.NASA_API_KEY" 
