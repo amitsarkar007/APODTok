@@ -1,7 +1,25 @@
 // NASA API configuration
-const API_KEY = window.NASA_API_KEY || 'NASA_API_KEY_PLACEHOLDER';
+let API_KEY = null;
 const API_URL = 'https://api.nasa.gov/planetary/apod';
 const CACHE_SIZE = 5; // Number of images to cache in advance
+
+// Initialize API key from Netlify Function
+async function initializeAPIKey() {
+    try {
+        // First try to get from window (if available)
+        if (window.NASA_API_KEY) {
+            API_KEY = window.NASA_API_KEY;
+            return;
+        }
+        
+        // Fallback to Netlify function
+        const response = await fetch('/.netlify/functions/get-api-key');
+        const data = await response.json();
+        API_KEY = data.apiKey;
+    } catch (error) {
+        console.error('Failed to fetch API key:', error);
+    }
+}
 
 // Proxy helper function
 async function fetchWithProxy(url) {
@@ -45,7 +63,8 @@ const aboutModal = document.getElementById('about-modal');
 const closeAbout = document.getElementById('close-about');
 
 // Initialize the app
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeAPIKey();
     initializeCache();
     setupEventListeners();
 });
