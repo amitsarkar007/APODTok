@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APODTok - NASA Astronomy Picture of the Day</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body class="bg-black text-white">
+    <div id="app" class="h-screen w-screen overflow-hidden">
+        <div id="loading" class="hidden fixed inset-0 flex items-center justify-center z-50">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+        </div>
+        <div id="error" class="hidden fixed inset-0 flex items-center justify-center z-50">
+            <div class="text-center p-4">
+                <p class="text-red-500 mb-4">Error loading image. Please try again.</p>
+                <button id="retry" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Retry
+                </button>
+            </div>
+        </div>
+        <div id="apod-container" class="h-full w-full overflow-y-auto">
+            <!-- APOD content will be dynamically inserted here -->
+        </div>
+        <button id="about-button" class="about-button">About</button>
+        <div id="about-modal" class="about-modal">
+            <div class="about-modal-content">
+                <button id="close-about" class="close-button">✕</button>
+                <h2>About APODTok</h2>
+                <p>A TikTok-style interface for exploring NASA's Astronomy Picture of the Day.</p>
+                <p class="about-links">
+                    Made with ❤️ by <a href="https://x.com/amit_sarkar007" target="_blank" rel="noopener noreferrer">@amitsarkar007</a>
+                </p>
+                <p class="about-links">
+                    Check out the code on <a href="https://github.com/amitsarkar007/APODTok" target="_blank" rel="noopener noreferrer">GitHub</a>
+                </p>
+                <p class="about-links">
+                    If you enjoy this project, you can <a href="https://buymeacoffee.com/amitsarkar" target="_blank" rel="noopener noreferrer">buy me a coffee! ☕</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 

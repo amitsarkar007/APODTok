@@ -1,0 +1,99 @@
+## Product Requirements Document (PRD)
+
+### Project Title:
+NASA Astronomy Picture of the Day (APOD) TikTok-style Viewer
+
+### Overview:
+This application will utilize NASA's APOD API to present astronomy images in a dynamic, vertical scrolling interface similar to TikTok. Users will see one random astronomy image at a time, with each refresh or upward scroll loading a new random image fetched from the Random APOD Generator endpoint.
+
+### Objectives:
+- Provide an engaging, visually appealing user experience.
+- Showcase NASA's APOD content dynamically.
+- Increase user interaction and content discovery through easy navigation.
+
+### Target Audience:
+- Space enthusiasts
+- Students and educators
+- Casual viewers interested in astronomy
+
+### Features:
+
+#### Primary Features:
+- **Dynamic Image Display:**
+  - Display one image per screen in a full-viewport format.
+  - Support random image loading upon refresh or scroll-up interaction.
+
+- **Image Metadata:**
+  - Clearly display metadata including:
+    - Title of the image
+    - Date of publication
+
+- **Interaction:**
+  - Vertical scrolling mechanics identical to TikTok/Instagram Reels.
+  - Every scroll-up gesture triggers a call to the random APOD endpoint, fetching and displaying a new random image.
+  - Pull-to-refresh capability for loading new random images.
+
+#### Secondary Features:
+- **Image Quality:**
+  - Images are fetched and displayed initially in a standard resolution.
+
+- **Loading and Transition Effects:**
+  - Smooth animations and transitions between images.
+  - Loading indicator for image fetch latency.
+
+### Technical Requirements:
+- **API Endpoint:** Utilize the provided Random APOD Generator endpoint from the official [NASA APOD API Repository](https://github.com/nasa/apod-api).
+- **Frontend:**
+  - HTML5, TailwindCSS, vanilla JavaScript
+  - Mobile-first responsive design
+  - Infinite scrolling mechanism implementation
+
+- **Error Handling:**
+  - Graceful fallback in case the API is unreachable or returns an error.
+  - Clear messaging or retry mechanism.
+
+### Sample API Request Structure:
+
+https://api.nasa.gov/planetary/apod?api_key=<YOUR_API_KEY>
+
+### Sample API Response Structure:
+```json
+{
+  "date": "2025-04-15",
+  "explanation": "...",
+  "hdurl": "https://apod.nasa.gov/apod/image/2504/NGC1514_WebbSchmidt_1983.jpg",
+  "media_type": "image",
+  "service_version": "v1",
+  "title": "Planetary Nebula NGC 1514 from Webb",
+  "url": "https://apod.nasa.gov/apod/image/2504/NGC1514_WebbSchmidt_960.jpg"
+}
+```
+
+API Query Parameters
++------------+------------+-----------+-----------------------------------------------------------------------------------+
+| Parameter  | Type       | Default   | Description                                                                       |
++------------+------------+-----------+-----------------------------------------------------------------------------------+
+| date       | YYYY-MM-DD | today     | The date of the APOD image to retrieve                                            |
+| start_date | YYYY-MM-DD | none      | The start of a date range, when requesting date for a range of dates.             |
+|            |            |           | Cannot be used with date.                                                         |
+| end_date   | YYYY-MM-DD | today     | The end of the date range, when used with start_date.                             |
+| count      | int        | none      | If this is specified then count randomly chosen images will be returned.          |
+|            |            |           | Cannot be used with date or start_date and end_date.                              |
+| thumbs     | bool       | False     | Return the URL of video thumbnail. If an APOD is not a video,                     |
+|            |            |           | this parameter is ignored.                                                        |
+| api_key    | string     | DEMO_KEY  | api.nasa.gov key for expanded usage                                               |
++------------+------------+-----------+-----------------------------------------------------------------------------------+
+
+### UI/UX Guidelines:
+- Ensure minimal UI distraction with a focus on the image content.
+- Text overlays for metadata should be clearly visible yet non-intrusive.
+- Interactive gestures (scroll-up) should feel natural and responsive.
+
+### Performance Considerations:
+- Optimize images to reduce load times without significantly compromising quality.
+- Implement caching to minimize unnecessary API calls.
+
+### NOTE
+- Attribution and Limits: Many free APIs require attribution or have daily call limits. Be sure to read their usage guidelines.
+- No server code. No back-end. Everything should be built in the front-end interface. Without using any complicated framework.
+- Ensure API Key is secure and not visible in any request.

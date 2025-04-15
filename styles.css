@@ -1,0 +1,234 @@
+/* Custom styles for APODTok */
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+#app {
+    min-height: 100%;
+}
+
+/* Hide scrollbars but keep functionality */
+#apod-container {
+    scroll-snap-type: y mandatory;
+    overflow-y: auto;
+    height: 100vh;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+#apod-container::-webkit-scrollbar {
+    display: none;
+}
+
+.apod-card {
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    scroll-snap-align: start;
+}
+
+.apod-image {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.apod-video {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.image-loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.image-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #ff4444;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.image-error p {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.image-error small {
+    opacity: 0.8;
+}
+
+.loading {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.loading.loaded {
+    opacity: 1;
+}
+
+.apod-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    padding: 1rem;
+    color: white;
+    z-index: 10;
+}
+
+.apod-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.apod-date {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.5);
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+}
+
+.pull-to-refresh.active {
+    transform: translateY(0);
+}
+
+/* Smooth transitions */
+.fade-enter {
+    opacity: 0;
+}
+
+.fade-enter-active {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.fade-exit {
+    opacity: 1;
+}
+
+.fade-exit-active {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.about-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+    z-index: 100;
+}
+
+.about-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.about-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.about-modal.active {
+    display: flex;
+}
+
+.about-modal-content {
+    background-color: #1a1a1a;
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+    color: white;
+}
+
+.close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.about-modal-content h2 {
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.about-modal-content p {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.about-links a {
+    color: #3b82f6;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.about-links a:hover {
+    color: #60a5fa;
+} 
