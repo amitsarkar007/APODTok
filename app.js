@@ -1,7 +1,9 @@
 // NASA API configuration
 let API_KEY = null;
 const API_URL = 'https://api.nasa.gov/planetary/apod';
-const CACHE_SIZE = 5; // Number of images to cache in advance
+const CACHE_SIZE = 5; // Number of images to fetch per batch
+const LOCAL_CACHE_KEY = 'apodtok-last-batch';
+const SLOW_HINT_DELAY_MS = 6000;
 
 // Initialize API key from Netlify Function
 async function initializeAPIKey() {
@@ -11,9 +13,9 @@ async function initializeAPIKey() {
             API_KEY = window.NASA_API_KEY;
             return;
         }
-        
+
         // Fallback to Netlify function
-        const response = await fetch('/.netlify/functions/get-api-key');
+        const response = await fetch('/.netlify/functions/get-api-key', { cache: 'no-store' });
         if (!response.ok) {
             throw new Error(`Failed to fetch API key: ${response.status} ${response.statusText}`);
         }
@@ -29,42 +31,55 @@ async function initializeAPIKey() {
     }
 }
 
-// Proxy helper function
-async function fetchWithProxy(url) {
-    try {
-        // First try direct fetch
-        try {
-            const directResponse = await fetch(url);
-            if (directResponse.ok) {
-                return await directResponse.json();
-            }
-        } catch (directError) {
-            console.log('Direct fetch failed, falling back to proxy:', directError);
-        }
+// Fetch APOD data directly from NASA with retry + backoff.
+// (The old fallback to the free allorigins.win CORS proxy was removed:
+//  that service is dead, and api.nasa.gov already allows browser requests.)
+async function fetchAPODs(count) {
+    const url = `${API_URL}?api_key=${API_KEY}&count=${count}`;
+    const delays = [0, 3000, 8000]; // retry backoff
+    let lastError = null;
 
-        // Fallback to proxy
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        
-        if (!response.ok) {
-            throw new Error(`Proxy request failed: ${response.status} ${response.statusText}`);
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+        if (delays[attempt] > 0) {
+            await new Promise(resolve => setTimeout(resolve, delays[attempt]));
         }
-        
-        const data = await response.json();
-        
-        if (!data.contents) {
-            throw new Error('Invalid proxy response format');
-        }
-        
         try {
-            return JSON.parse(data.contents);
-        } catch (parseError) {
-            console.error('Failed to parse proxy response:', data.contents);
-            throw new Error('Invalid JSON in proxy response');
+            const response = await fetch(url);
+            if (!response.ok) {
+                // NASA is sometimes slow or returns 5xx during incidents - retry
+                throw new Error(`NASA API responded ${response.status}`);
+            }
+            const data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) {
+                throw new Error('NASA API returned no images');
+            }
+            return data;
+        } catch (error) {
+            console.warn(`APOD fetch attempt ${attempt + 1} failed:`, error);
+            lastError = error;
         }
-    } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
+    }
+    throw lastError || new Error('Failed to load images from NASA');
+}
+
+// Local cache of the last good batch, so the site still opens with content
+// when NASA's API is slow or having an outage.
+function saveLocalBatch(apods) {
+    try {
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), apods }));
+    } catch (e) {
+        // storage full or unavailable - not critical
+    }
+}
+
+function loadLocalBatch() {
+    try {
+        const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed.apods) && parsed.apods.length ? parsed.apods : null;
+    } catch (e) {
+        return null;
     }
 }
 
@@ -84,6 +99,7 @@ if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || wi
 // DOM elements
 const apodContainer = document.getElementById('apod-container');
 const loadingIndicator = document.getElementById('loading');
+const loadingText = document.getElementById('loading-text');
 const errorContainer = document.getElementById('error');
 const retryButton = document.getElementById('retry');
 
@@ -94,6 +110,7 @@ let touchStartY = 0;
 let pullToRefreshActive = false;
 let isScrolling = false;
 let scrollTimeout;
+let slowHintTimer = null;
 
 // About modal functionality
 const aboutButton = document.getElementById('about-button');
@@ -110,16 +127,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Initialize cache with initial set of images
 async function initializeCache() {
     showLoading();
+    hideError();
+
+    // Render the last good batch instantly while NASA responds (or fails)
+    const staleBatch = loadLocalBatch();
+    if (staleBatch) {
+        apodCache = staleBatch;
+        displayAllAPODs();
+    }
+
+    startSlowHint();
     try {
-        const url = `${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`;
-        const data = await fetchWithProxy(url);
+        const data = await fetchAPODs(CACHE_SIZE);
         apodCache = data;
+        saveLocalBatch(data);
         displayAllAPODs();
         preloadNextImages();
     } catch (error) {
         console.error('Error initializing cache:', error);
-        showError();
+        if (!staleBatch) {
+            showError();
+        }
+        // With a stale batch on screen, stay quiet: the user can keep browsing
+        // and pull-to-refresh / Retry will try again.
     } finally {
+        stopSlowHint();
         hideLoading();
     }
 }
@@ -127,12 +159,11 @@ async function initializeCache() {
 // Preload next set of images
 async function preloadNextImages() {
     if (isFetching) return;
-    
+
     isFetching = true;
     try {
-        const url = `${API_URL}?api_key=${API_KEY}&count=${CACHE_SIZE}`;
-        const newImages = await fetchWithProxy(url);
-        
+        const newImages = await fetchAPODs(CACHE_SIZE);
+
         // Start preloading images before adding them to the DOM
         const preloadPromises = newImages
             .filter(apod => apod.media_type === 'image')
@@ -147,8 +178,9 @@ async function preloadNextImages() {
 
         // Wait for all preload attempts to complete (success or failure)
         await Promise.all(preloadPromises);
-        
+
         apodCache = [...apodCache, ...newImages];
+        saveLocalBatch(apodCache.slice(-20)); // keep the stored batch small
         appendNewAPODs(newImages);
     } catch (error) {
         console.error('Error preloading images:', error);
@@ -192,7 +224,7 @@ function createAPODCard(apod) {
         // For image content
         const image = document.createElement('img');
         image.className = 'apod-image';
-        
+
         // Add loading state
         image.classList.add('loading');
         const loader = document.createElement('div');
@@ -311,7 +343,7 @@ function handleScroll() {
     isScrolling = true;
     scrollTimeout = setTimeout(() => {
         isScrolling = false;
-        
+
         const scrollTop = apodContainer.scrollTop;
         const scrollHeight = apodContainer.scrollHeight;
         const clientHeight = apodContainer.clientHeight;
@@ -390,10 +422,27 @@ function hideLoading() {
     loadingIndicator.classList.add('hidden');
 }
 
+function startSlowHint() {
+    stopSlowHint();
+    if (loadingText) {
+        loadingText.textContent = 'Loading images from NASA...';
+        slowHintTimer = setTimeout(() => {
+            loadingText.textContent = "NASA's API is slow right now - still trying...";
+        }, SLOW_HINT_DELAY_MS);
+    }
+}
+
+function stopSlowHint() {
+    if (slowHintTimer) {
+        clearTimeout(slowHintTimer);
+        slowHintTimer = null;
+    }
+}
+
 function showError() {
     errorContainer.classList.remove('hidden');
 }
 
 function hideError() {
     errorContainer.classList.add('hidden');
-} 
+}

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'apodtok-cache-v1';
-const RUNTIME_CACHE = 'apodtok-runtime';
+const CACHE_NAME = 'apodtok-cache-v2';
+const RUNTIME_CACHE = 'apodtok-runtime-v2';
 
 // Resources to cache on install
 const PRECACHE_URLS = [
@@ -33,50 +33,35 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event - network first, then cache
+// Fetch event
 self.addEventListener('fetch', event => {
-    // Skip cross-origin requests
+    // Skip cross-origin requests (NASA API calls and images go straight to the network)
     if (!event.request.url.startsWith(self.location.origin)) {
         return;
     }
 
-    // Handle API requests differently
-    if (event.request.url.includes('api.nasa.gov')) {
-        event.respondWith(
-            fetch(event.request)
-                .then(response => {
-                    // Cache response for future offline use
+    // Never cache Netlify Function responses (e.g. the API key endpoint)
+    if (event.request.url.includes('/.netlify/functions/')) {
+        return;
+    }
+
+    // Network-first for the app shell (HTML/JS/CSS) so updates reach users
+    // immediately; fall back to cache when offline.
+    event.respondWith(
+        fetch(event.request)
+            .then(response => {
+                if (response.ok) {
                     const clonedResponse = response.clone();
                     caches.open(RUNTIME_CACHE).then(cache => {
                         cache.put(event.request, clonedResponse);
                     });
-                    return response;
-                })
-                .catch(() => {
-                    // If offline, try to return cached response
-                    return caches.match(event.request);
-                })
-        );
-        return;
-    }
-
-    // For all other requests, try cache first, then network
-    event.respondWith(
-        caches.match(event.request)
-            .then(cachedResponse => {
-                if (cachedResponse) {
-                    return cachedResponse;
                 }
-
-                return caches.open(RUNTIME_CACHE)
-                    .then(cache => {
-                        return fetch(event.request)
-                            .then(response => {
-                                // Cache the response for future use
-                                cache.put(event.request, response.clone());
-                                return response;
-                            });
-                    });
+                return response;
+            })
+            .catch(() => {
+                return caches.match(event.request).then(cachedResponse => {
+                    return cachedResponse || caches.match('/index.html');
+                });
             })
     );
-}); 
+});
