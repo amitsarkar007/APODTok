@@ -11,7 +11,10 @@
 <body class="bg-black text-white">
     <div id="app" class="h-screen w-screen overflow-hidden">
         <div id="loading" class="hidden fixed inset-0 flex items-center justify-center z-50">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+                <p id="loading-text" class="mt-4 text-sm text-gray-300">Loading images from NASA...</p>
+            </div>
         </div>
         <div id="error" class="hidden fixed inset-0 flex items-center justify-center z-50">
             <div class="text-center p-4">
@@ -44,4 +47,4 @@
     </div>
     <script src="app.js"></script>
 </body>
-</html> 
+</html>
