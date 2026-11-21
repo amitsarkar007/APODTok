@@ -45,6 +45,9 @@ function extractVideoSrc(html) {
     if (!html) return null;
     const video = html.match(/<video[^>]*src="([^"]+)"/i);
     if (video) return video[1];
+    // WordPress APOD puts the file in a <source> child of <video>
+    const source = html.match(/<source[^>]*src="([^"]+\.(?:mp4|webm|ogg)[^"]*)"/i);
+    if (source) return source[1];
     const iframe = html.match(/<iframe[^>]*src="([^"]+)"/i);
     if (iframe) return iframe[1];
     return null;
