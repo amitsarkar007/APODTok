@@ -2,7 +2,7 @@
 // The API key never reaches the browser: a Netlify Function calls NASA
 // server-side (with the key stored only on Netlify) and returns the data.
 const FEED_URL = '/.netlify/functions/apod';
-const BATCH_DAYS = 7; // Number of days of pictures to fetch per batch
+const BATCH_DAYS = 7; // Number of random pictures to fetch per batch
 const LOCAL_CACHE_KEY = 'apodtok-last-batch';
 const SLOW_HINT_DELAY_MS = 6000;
 
@@ -17,13 +17,9 @@ function isRealAPOD(apod) {
     return true;
 }
 
-// Fetch APOD data from our Netlify Function with retry + backoff.
-// `before` (optional, YYYY-MM-DD) pages further back for infinite scroll.
-async function fetchAPODs(days, before) {
-    let url = `${FEED_URL}?days=${days}`;
-    if (before) {
-        url += `&before=${encodeURIComponent(before)}`;
-    }
+// Fetch a random batch of APODs from our Netlify Function with retry + backoff.
+async function fetchAPODs(count) {
+    const url = `${FEED_URL}?mode=random&count=${count}`;
     const delays = [0, 3000, 8000]; // retry backoff
     let lastError = null;
 
@@ -164,9 +160,14 @@ async function preloadNextImages() {
 
     isFetching = true;
     try {
-        const fresh = await fetchAPODs(BATCH_DAYS, oldestLoadedDate());
+        // Random batches can overlap what is already on screen; retry a few
+        // times so scrolling keeps producing fresh pictures.
         const known = new Set(apodCache.map(a => a.date));
-        const newImages = fresh.filter(a => !known.has(a.date));
+        let newImages = [];
+        for (let attempt = 0; attempt < 3 && newImages.length === 0; attempt++) {
+            const fresh = await fetchAPODs(BATCH_DAYS);
+            newImages = fresh.filter(a => !known.has(a.date));
+        }
         if (newImages.length === 0) return;
 
         // Start preloading images before adding them to the DOM
@@ -192,17 +193,6 @@ async function preloadNextImages() {
     } finally {
         isFetching = false;
     }
-}
-
-// Oldest picture date currently on screen, for paging further back
-function oldestLoadedDate() {
-    let oldest = null;
-    for (const apod of apodCache) {
-        if (apod && apod.date && (!oldest || apod.date < oldest)) {
-            oldest = apod.date;
-        }
-    }
-    return oldest;
 }
 
 // Display all APODs in the cache

@@ -99,11 +99,54 @@ async function fetchRange(dateFrom, dateTo) {
     }
 }
 
+// Fetch one APOD by legacy date code (YYMMDD)
+async function fetchOne(code) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+        const response = await fetch(`${WP_API}/${code}`, { signal: controller.signal });
+        if (!response.ok) return null;
+        return mapEntry(await response.json());
+    } catch (e) {
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+// Distinct random date codes across all of APOD history (first: 1995-06-16)
+function randomDateCodes(n) {
+    const start = Date.UTC(1995, 5, 16);
+    const span = Date.now() - start;
+    const codes = new Set();
+    let guard = 0;
+    while (codes.size < n && guard++ < n * 10) {
+        codes.add(legacyCode(isoDate(new Date(start + Math.random() * span))));
+    }
+    return [...codes];
+}
+
+// Random batch: a few extra picks so skipped days (early years) still fill the batch
+async function randomBatch(count) {
+    const results = await Promise.all(randomDateCodes(count + 3).map(fetchOne));
+    return results.filter(isRealAPOD).slice(0, count);
+}
+
 exports.handler = async function (event) {
     const params = (event && event.queryStringParameters) || {};
-    let days = parseInt(params.days, 10);
+    let days = parseInt(params.days || params.count, 10);
     if (!Number.isFinite(days) || days < 1) days = 7;
     days = Math.min(days, MAX_DAYS);
+
+    // Random mode: pictures from anywhere in APOD history
+    if (params.mode === 'random') {
+        const apods = await randomBatch(days);
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ apods, degraded: apods.length === 0 })
+        };
+    }
 
     // `before` is exclusive; default is tomorrow so today is included.
     let end = new Date();
