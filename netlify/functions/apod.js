@@ -41,6 +41,19 @@ function resized(url, width) {
     return url.split('?')[0] + `?w=${width}&fit=clip`;
 }
 
+// Some entries carry a 48x48 thumbnail rendition in hdurl - never use those
+function isThumbnailUrl(url) {
+    return /thumbnail|jcr:content\/renditions/i.test(url || '');
+}
+
+function extractImageSrc(html) {
+    if (!html) return null;
+    const img = html.match(/<img[^>]*src="([^"]+)"/i);
+    if (!img) return null;
+    const src = img[1];
+    return src.startsWith('/') ? 'https://science.nasa.gov' + src : src;
+}
+
 function extractVideoSrc(html) {
     if (!html) return null;
     const video = html.match(/<video[^>]*src="([^"]+)"/i);
@@ -66,11 +79,17 @@ function mapEntry(e) {
         copyright: e.copyright || undefined
     };
     if (e.media_type === 'image') {
-        if (!e.hdurl) return null;
+        // The <img> in basic_html is the canonical full picture; hdurl is the
+        // fallback but sometimes holds a 48x48 thumbnail rendition.
+        let img = extractImageSrc(e.basic_html);
+        if ((!img || isThumbnailUrl(img)) && e.hdurl && !isThumbnailUrl(e.hdurl)) {
+            img = e.hdurl;
+        }
+        if (!img || isThumbnailUrl(img)) return null;
         return Object.assign(base, {
             media_type: 'image',
-            url: resized(e.hdurl, 1200),
-            hdurl: e.hdurl
+            url: resized(img, 1200),
+            hdurl: img
         });
     }
     const src = extractVideoSrc(e.basic_html);
@@ -78,7 +97,7 @@ function mapEntry(e) {
     return Object.assign(base, {
         media_type: 'video',
         url: src,
-        hdurl: e.hdurl || undefined
+        hdurl: (e.hdurl && !isThumbnailUrl(e.hdurl)) ? e.hdurl : undefined
     });
 }
 
