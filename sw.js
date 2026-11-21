@@ -1,5 +1,5 @@
-const CACHE_NAME = 'apodtok-cache-v2';
-const RUNTIME_CACHE = 'apodtok-runtime-v2';
+const CACHE_NAME = 'apodtok-cache-v3';
+const RUNTIME_CACHE = 'apodtok-runtime-v3';
 
 // Resources to cache on install
 const PRECACHE_URLS = [
@@ -40,7 +40,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Never cache Netlify Function responses (e.g. the API key endpoint)
+    // Never cache Netlify Function responses (the APOD feed endpoint)
     if (event.request.url.includes('/.netlify/functions/')) {
         return;
     }

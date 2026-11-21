@@ -30,11 +30,14 @@
         </div>
         <div id="error" class="hidden fixed inset-0 flex items-center justify-center z-50">
             <div class="text-center p-4">
-                <p class="text-red-500 mb-4">Error loading image. Please try again.</p>
+                <p class="text-red-500 mb-4">NASA's picture feed is having problems right now. Please try again in a little while.</p>
                 <button id="retry" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                     Retry
                 </button>
             </div>
+        </div>
+        <div id="notice" class="hidden fixed bottom-4 inset-x-0 z-40 flex justify-center pointer-events-none">
+            <p class="bg-gray-800 text-gray-200 text-sm px-4 py-2 rounded opacity-90">NASA's feed is having problems - showing saved pictures.</p>
         </div>
         <div id="apod-container" class="h-full w-full overflow-y-auto">
             <!-- APOD content will be dynamically inserted here -->

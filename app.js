@@ -1,41 +1,29 @@
-// NASA API configuration
-let API_KEY = null;
-const API_URL = 'https://api.nasa.gov/planetary/apod';
-const CACHE_SIZE = 5; // Number of images to fetch per batch
+// NASA APOD feed configuration.
+// The API key never reaches the browser: a Netlify Function calls NASA
+// server-side (with the key stored only on Netlify) and returns the data.
+const FEED_URL = '/.netlify/functions/apod';
+const BATCH_DAYS = 7; // Number of days of pictures to fetch per batch
 const LOCAL_CACHE_KEY = 'apodtok-last-batch';
 const SLOW_HINT_DELAY_MS = 6000;
 
-// Initialize API key from Netlify Function
-async function initializeAPIKey() {
-    try {
-        // First try to get from window (if available)
-        if (window.NASA_API_KEY) {
-            API_KEY = window.NASA_API_KEY;
-            return;
-        }
-
-        // Fallback to Netlify function
-        const response = await fetch('/.netlify/functions/get-api-key', { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`Failed to fetch API key: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        if (!data.apiKey) {
-            throw new Error('API key not found in response');
-        }
-        API_KEY = data.apiKey;
-    } catch (error) {
-        console.error('Failed to fetch API key:', error);
-        showError();
-        throw error;
-    }
+// NASA's API sometimes answers 200 "success" with fake placeholder cards
+// during its outages (title "NASA Science", the NASA logo as the image).
+// Those are never real pictures, so they are filtered everywhere.
+function isRealAPOD(apod) {
+    if (!apod || typeof apod.url !== 'string' || !apod.url) return false;
+    if (apod.title === 'NASA Science') return false;
+    if (apod.url.includes('nasa-logo')) return false;
+    if (apod.hdurl && apod.hdurl.includes('nasa-logo')) return false;
+    return true;
 }
 
-// Fetch APOD data directly from NASA with retry + backoff.
-// (The old fallback to the free allorigins.win CORS proxy was removed:
-//  that service is dead, and api.nasa.gov already allows browser requests.)
-async function fetchAPODs(count) {
-    const url = `${API_URL}?api_key=${API_KEY}&count=${count}`;
+// Fetch APOD data from our Netlify Function with retry + backoff.
+// `before` (optional, YYYY-MM-DD) pages further back for infinite scroll.
+async function fetchAPODs(days, before) {
+    let url = `${FEED_URL}?days=${days}`;
+    if (before) {
+        url += `&before=${encodeURIComponent(before)}`;
+    }
     const delays = [0, 3000, 8000]; // retry backoff
     let lastError = null;
 
@@ -44,16 +32,18 @@ async function fetchAPODs(count) {
             await new Promise(resolve => setTimeout(resolve, delays[attempt]));
         }
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) {
-                // NASA is sometimes slow or returns 5xx during incidents - retry
-                throw new Error(`NASA API responded ${response.status}`);
+                // The function may be slow or return 5xx during incidents - retry
+                throw new Error(`Feed responded ${response.status}`);
             }
-            const data = await response.json();
-            if (!Array.isArray(data) || data.length === 0) {
-                throw new Error('NASA API returned no images');
+            const payload = await response.json();
+            const apods = (Array.isArray(payload) ? payload : (payload.apods || []))
+                .filter(isRealAPOD);
+            if (apods.length === 0) {
+                throw new Error('No real pictures available from NASA right now');
             }
-            return data;
+            return apods;
         } catch (error) {
             console.warn(`APOD fetch attempt ${attempt + 1} failed:`, error);
             lastError = error;
@@ -66,7 +56,9 @@ async function fetchAPODs(count) {
 // when NASA's API is slow or having an outage.
 function saveLocalBatch(apods) {
     try {
-        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), apods }));
+        const realOnly = (apods || []).filter(isRealAPOD);
+        if (realOnly.length === 0) return; // never save placeholder cards
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), apods: realOnly }));
     } catch (e) {
         // storage full or unavailable - not critical
     }
@@ -77,7 +69,14 @@ function loadLocalBatch() {
         const raw = localStorage.getItem(LOCAL_CACHE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed.apods) && parsed.apods.length ? parsed.apods : null;
+        if (!Array.isArray(parsed.apods)) return null;
+        const realOnly = parsed.apods.filter(isRealAPOD);
+        if (realOnly.length === 0) {
+            // Cache held only placeholder cards from a NASA outage - purge it
+            localStorage.removeItem(LOCAL_CACHE_KEY);
+            return null;
+        }
+        return realOnly;
     } catch (e) {
         return null;
     }
@@ -102,6 +101,7 @@ const loadingIndicator = document.getElementById('loading');
 const loadingText = document.getElementById('loading-text');
 const errorContainer = document.getElementById('error');
 const retryButton = document.getElementById('retry');
+const noticeContainer = document.getElementById('notice');
 
 // State management
 let apodCache = [];
@@ -118,8 +118,7 @@ const aboutModal = document.getElementById('about-modal');
 const closeAbout = document.getElementById('close-about');
 
 // Initialize the app
-document.addEventListener('DOMContentLoaded', async () => {
-    await initializeAPIKey();
+document.addEventListener('DOMContentLoaded', () => {
     initializeCache();
     setupEventListeners();
 });
@@ -138,18 +137,21 @@ async function initializeCache() {
 
     startSlowHint();
     try {
-        const data = await fetchAPODs(CACHE_SIZE);
+        const data = await fetchAPODs(BATCH_DAYS);
         apodCache = data;
         saveLocalBatch(data);
         displayAllAPODs();
+        hideNotice();
         preloadNextImages();
     } catch (error) {
         console.error('Error initializing cache:', error);
         if (!staleBatch) {
             showError();
+        } else {
+            // Real pictures are already on screen - be honest that they are saved ones
+            showNotice();
         }
-        // With a stale batch on screen, stay quiet: the user can keep browsing
-        // and pull-to-refresh / Retry will try again.
+        // Pull-to-refresh / Retry will try again.
     } finally {
         stopSlowHint();
         hideLoading();
@@ -162,7 +164,10 @@ async function preloadNextImages() {
 
     isFetching = true;
     try {
-        const newImages = await fetchAPODs(CACHE_SIZE);
+        const fresh = await fetchAPODs(BATCH_DAYS, oldestLoadedDate());
+        const known = new Set(apodCache.map(a => a.date));
+        const newImages = fresh.filter(a => !known.has(a.date));
+        if (newImages.length === 0) return;
 
         // Start preloading images before adding them to the DOM
         const preloadPromises = newImages
@@ -180,13 +185,24 @@ async function preloadNextImages() {
         await Promise.all(preloadPromises);
 
         apodCache = [...apodCache, ...newImages];
-        saveLocalBatch(apodCache.slice(-20)); // keep the stored batch small
+        saveLocalBatch(apodCache.slice(0, 20)); // keep the stored batch small (newest first)
         appendNewAPODs(newImages);
     } catch (error) {
         console.error('Error preloading images:', error);
     } finally {
         isFetching = false;
     }
+}
+
+// Oldest picture date currently on screen, for paging further back
+function oldestLoadedDate() {
+    let oldest = null;
+    for (const apod of apodCache) {
+        if (apod && apod.date && (!oldest || apod.date < oldest)) {
+            oldest = apod.date;
+        }
+    }
+    return oldest;
 }
 
 // Display all APODs in the cache
@@ -445,4 +461,12 @@ function showError() {
 
 function hideError() {
     errorContainer.classList.add('hidden');
+}
+
+function showNotice() {
+    if (noticeContainer) noticeContainer.classList.remove('hidden');
+}
+
+function hideNotice() {
+    if (noticeContainer) noticeContainer.classList.add('hidden');
 }
