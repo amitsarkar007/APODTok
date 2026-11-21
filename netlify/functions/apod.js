@@ -1,9 +1,14 @@
-// Server-side APOD feed: calls NASA with the secret key and returns only
-// the picture data, so NASA_API_KEY never reaches the browser.
+// Server-side APOD feed: pulls from NASA's new WordPress "APOD Basic" JSON
+// API and returns only picture data. The legacy api.nasa.gov APOD API was
+// migrated to this WordPress API on 2026-09-10 (legacy goes offline
+// 2026-12-01; it answered with fake placeholder cards during the transition).
+// The new API needs NO key, so no secret is involved anywhere.
+// Docs: https://api.nasa.gov/assets/files/apod/APOD-APIs-and-RSS-info.pdf
+//
 // Query params:
 //   days   (optional, 1-14, default 7) - how many days of pictures to return
 //   before (optional, YYYY-MM-DD)      - return days strictly before this date
-const API_URL = 'https://api.nasa.gov/planetary/apod';
+const WP_API = 'https://science.nasa.gov/wp-json/wp/v2/apod-basic';
 const MAX_DAYS = 14;
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -12,9 +17,7 @@ const headers = {
     'Cache-Control': 'no-store'
 };
 
-// NASA sometimes answers 200 "success" with fake placeholder cards during
-// its outages (title "NASA Science", the NASA logo as the image).
-// Those are never real pictures, so they are filtered here and in the app.
+// Safety net from the legacy-API outage: never let placeholder cards through.
 function isRealAPOD(apod) {
     if (!apod || typeof apod.url !== 'string' || !apod.url) return false;
     if (apod.title === 'NASA Science') return false;
@@ -27,31 +30,73 @@ function isoDate(d) {
     return d.toISOString().slice(0, 10);
 }
 
-async function fetchOneDay(dateStr, apiKey) {
+// '2026-11-20' -> '261120' (legacy YYMMDD date code the WP filters use)
+function legacyCode(dateStr) {
+    return dateStr.slice(2, 4) + dateStr.slice(5, 7) + dateStr.slice(8, 10);
+}
+
+// Ask the dynamic image service for a phone-friendly size when possible
+function resized(url, width) {
+    if (!url || !url.includes('dynamicimage')) return url;
+    return url.split('?')[0] + `?w=${width}&fit=clip`;
+}
+
+function extractVideoSrc(html) {
+    if (!html) return null;
+    const video = html.match(/<video[^>]*src="([^"]+)"/i);
+    if (video) return video[1];
+    const iframe = html.match(/<iframe[^>]*src="([^"]+)"/i);
+    if (iframe) return iframe[1];
+    return null;
+}
+
+// Map the WordPress entry to the legacy APOD shape the app renders:
+// { date, title, explanation, media_type, url, hdurl, copyright }
+// Images: url = resized image, hdurl = full-size image.
+// Videos: url = direct mp4 or embed src, hdurl = poster image.
+function mapEntry(e) {
+    if (!e || !e.date || !e.title) return null;
+    const base = {
+        date: e.date,
+        title: e.title,
+        explanation: e.explanation || '',
+        copyright: e.copyright || undefined
+    };
+    if (e.media_type === 'image') {
+        if (!e.hdurl) return null;
+        return Object.assign(base, {
+            media_type: 'image',
+            url: resized(e.hdurl, 1200),
+            hdurl: e.hdurl
+        });
+    }
+    const src = extractVideoSrc(e.basic_html);
+    if (!src) return null;
+    return Object.assign(base, {
+        media_type: 'video',
+        url: src,
+        hdurl: e.hdurl || undefined
+    });
+}
+
+async function fetchRange(dateFrom, dateTo) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-        const response = await fetch(`${API_URL}?api_key=${apiKey}&date=${dateStr}`, { signal: controller.signal });
-        if (!response.ok) return null;
-        const apod = await response.json();
-        return isRealAPOD(apod) ? apod : null;
+        const url = `${WP_API}?date_from=${legacyCode(dateFrom)}&date_to=${legacyCode(dateTo)}&per_page=25`;
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) return [];
+        const data = await response.json();
+        if (!Array.isArray(data)) return [];
+        return data.map(mapEntry).filter(isRealAPOD);
     } catch (e) {
-        return null;
+        return [];
     } finally {
         clearTimeout(timer);
     }
 }
 
 exports.handler = async function (event) {
-    const apiKey = process.env.NASA_API_KEY;
-    if (!apiKey) {
-        return {
-            statusCode: 500,
-            headers,
-            body: JSON.stringify({ error: 'NASA_API_KEY environment variable is not set' })
-        };
-    }
-
     const params = (event && event.queryStringParameters) || {};
     let days = parseInt(params.days, 10);
     if (!Number.isFinite(days) || days < 1) days = 7;
@@ -67,15 +112,13 @@ exports.handler = async function (event) {
         }
     }
 
-    const dates = [];
-    for (let i = 0; i < days; i++) {
-        const d = new Date(end);
-        d.setUTCDate(d.getUTCDate() - i);
-        dates.push(isoDate(d));
-    }
+    const newest = isoDate(end);
+    const oldestDate = new Date(end);
+    oldestDate.setUTCDate(oldestDate.getUTCDate() - (days - 1));
+    const oldest = isoDate(oldestDate);
 
-    const results = await Promise.all(dates.map(d => fetchOneDay(d, apiKey)));
-    const apods = results.filter(Boolean);
+    const apods = (await fetchRange(oldest, newest))
+        .sort((a, b) => (a.date < b.date ? 1 : -1));
 
     return {
         statusCode: 200,

@@ -229,13 +229,27 @@ function createAPODCard(apod) {
 
     // Handle different media types
     if (apod.media_type === 'video') {
-        // For video content (usually YouTube)
-        const iframe = document.createElement('iframe');
-        iframe.className = 'apod-video';
-        iframe.src = apod.url;
-        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-        iframe.allowFullscreen = true;
-        apodCard.appendChild(iframe);
+        if (/\.(mp4|webm|ogg)(\?|$)/i.test(apod.url)) {
+            // Direct video file (NASA's WordPress APOD feed)
+            const video = document.createElement('video');
+            video.className = 'apod-video';
+            video.controls = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+            if (apod.hdurl) {
+                video.poster = apod.hdurl;
+            }
+            video.src = apod.url;
+            apodCard.appendChild(video);
+        } else {
+            // For embedded video content (usually YouTube)
+            const iframe = document.createElement('iframe');
+            iframe.className = 'apod-video';
+            iframe.src = apod.url;
+            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            iframe.allowFullscreen = true;
+            apodCard.appendChild(iframe);
+        }
     } else {
         // For image content
         const image = document.createElement('img');
